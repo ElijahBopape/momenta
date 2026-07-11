@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InvitationCard } from "@/components/brand/invitation-card";
 import { StatusBadge } from "@/components/brand/status-badge";
+import { AddToCalendarButton } from "@/components/brand/add-to-calendar-button";
+import { WeatherWidget } from "@/components/brand/weather-widget";
 import { getActivity } from "@/design/activities";
 import { CopyLinkButton } from "./copy-link-button";
 
@@ -79,13 +81,28 @@ export default async function InvitationDetailPage({ params }: { params: Promise
       )}
 
       {invitation.status === "accepted" && activity && response?.response_date && response?.response_time && (
-        <div className="w-full rounded-2xl border border-border bg-card p-4 text-left text-sm">
-          <p className="font-semibold">
-            {activity.emoji} {activity.label}
-          </p>
-          <p className="text-muted-foreground">{formatResponseDate(response.response_date)}</p>
-          <p className="text-muted-foreground">{formatResponseTime(response.response_time)}</p>
-        </div>
+        <>
+          <div className="w-full rounded-2xl border border-border bg-card p-4 text-left text-sm">
+            <p className="font-semibold">
+              {activity.emoji} {activity.label}
+            </p>
+            <p className="text-muted-foreground">{formatResponseDate(response.response_date)}</p>
+            <p className="text-muted-foreground">{formatResponseTime(response.response_time)}</p>
+          </div>
+
+          <WeatherWidget date={response.response_date} />
+
+          <AddToCalendarButton
+            className="w-full rounded-full"
+            event={{
+              uid: `${invitation.id}@momenta-web.vercel.app`,
+              summary: `${activity.emoji} ${activity.label} with ${response.recipient_name}`,
+              description: "Planned via momenta",
+              date: response.response_date,
+              time: response.response_time,
+            }}
+          />
+        </>
       )}
 
       {invitation.status === "declined" && <p className="text-sm text-muted-foreground">They declined this one.</p>}

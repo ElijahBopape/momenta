@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { ACTIVITIES, getActivity } from "@/design/activities";
 import { RECIPIENT_NAME_MAX_LENGTH } from "@/design/invitation";
 import { cn } from "@/lib/utils";
+import { AddToCalendarButton } from "@/components/brand/add-to-calendar-button";
+import { WeatherWidget } from "@/components/brand/weather-widget";
 import { declineInvitation, acceptInvitation } from "./actions";
 import type { PublicInvitation } from "./data";
 
@@ -215,9 +217,23 @@ export function PublicInvitationFlow({ token, invitation }: { token: string; inv
             </p>
             <p className="text-muted-foreground">{time}</p>
           </div>
+
+          <div className="flex justify-center">
+            <WeatherWidget date={date} />
+          </div>
+
+          <AddToCalendarButton
+            className="w-full rounded-full"
+            event={{
+              uid: `${token}@momenta-web.vercel.app`,
+              summary: `${getActivity(activity ?? "")?.emoji ?? ""} ${getActivity(activity ?? "")?.label ?? "Date"}`.trim(),
+              description: "Planned via momenta",
+              date,
+              time,
+            }}
+          />
           <p className="text-xs text-muted-foreground">
-            Finding a spot and adding this to your calendar are coming in later milestones — for now, message
-            them to lock in the details.
+            Finding a spot for it is in a different tab — message them to lock in exactly where.
           </p>
         </div>
       )}
