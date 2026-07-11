@@ -206,6 +206,18 @@ Each milestone is independently demoable, endable in its own commit(s), and push
 | 6 | **Calendar & Weather** | `.ics` export, Open-Meteo `WeatherProvider`, wired into the accept/celebration screen | Confirmed plan shows live weather and downloads a valid calendar file |
 | 7 | **Hardening & Launch Readiness** | Rate limiting, RLS audit, accessibility pass, OG tags for share links, error tracking, empty/error states | App is safe to share publicly at small scale |
 
+### Milestone 1 — status: done
+
+Built: Next.js/TS/Tailwind/shadcn scaffold, the full brand system (logo, 8-species mascot registry, palette, self-hosted Baloo 2, system-aware dark mode) ported into the app, the 3-tab app shell, and Supabase Auth end-to-end (signup, login, logout, password reset) with a `profiles` table provisioned automatically via a DB trigger. Verified live: signup → profile-row creation → login → protected shell → logout → protected-route redirect.
+
+Infrastructure: Supabase provisioned free-tier via the Vercel Marketplace integration (`vercel install supabase`), project linked to GitHub, Vercel project renamed to `momenta-web` to secure the stable `momenta-web.vercel.app` domain before any Supabase redirect URLs were configured against it.
+
+**Two manual dashboard steps remain before the email-driven flows work with real inbox clicks** (can't be done via the CLI/API access this project has):
+1. **Auth → Email Templates**, in both "Confirm signup" and "Reset Password": change the link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<signup|recovery>&next=/create` (or `/update-password` for reset) — the default templates don't use this format, and the app's `/auth/confirm` route expects it.
+2. **Auth → URL Configuration**: set Site URL to `https://momenta-web.vercel.app` and add both `https://momenta-web.vercel.app/**` and `http://localhost:3000/**` to Redirect URLs — otherwise Supabase rejects the redirect after verification (the exact gotcha this project has hit before with the wrong domain).
+
+Everything else — the account/session mechanics, RLS, the trigger, the protected routing — was verified directly against the real Supabase project (via the Admin API and a temporary confirmed test user, cleaned up after).
+
 ---
 
 ## 9. Decisions Log
