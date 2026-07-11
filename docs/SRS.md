@@ -247,6 +247,18 @@ Reads and the mark-as-read write go straight from the browser client, no server 
 
 **Real bug found and fixed during testing**: `@supabase/ssr`'s cookie-based browser client does not automatically forward the session JWT to the Realtime client the way the plain localStorage-based `@supabase/supabase-js` client does. Without an explicit `supabase.realtime.setAuth(session.access_token)` call, `postgres_changes` silently evaluates RLS as unauthenticated and delivers nothing — no error on either side, which made it genuinely hard to spot (the channel subscribes successfully, the row inserts successfully, nothing looks wrong until you watch the actual WebSocket frames). Fixed by calling `setAuth` on session load and on every `onAuthStateChange` event. Verified with a real two-browser-context test: recipient responds in one context, the sender's already-open tab updates live with no reload.
 
+### Milestone 5 — status: done
+
+Built per D5/D6: a `VenueSearchProvider` backed by Nominatim (geocoding) and Overpass (venue search), both free and keyless, cache-backed via `venue_cache` (30d geocode / 24h search TTLs) to respect both services' fair-use limits. Activity categories reuse the same `ACTIVITIES` registry from Milestone 3 rather than a second taxonomy, each with an OSM tag mapping (a few are best-effort proxies — noted in-code, e.g. Hiking → `leisure=nature_reserve` since OSM has no clean "hiking POI" tag). "Open now" uses `opening_hours.js` rather than a hand-rolled parser for what is genuinely a small DSL. The Find a Spot page itself: city/activity/radius/open-now filters, a results list (no embedded map, per D6) with distance and hours, each result linking out to Google Maps.
+
+Two real bugs found and fixed during testing, both before shipping:
+1. `isOpenNow` was being computed once at fetch time and cached for up to 24h alongside the venue data — a place correctly "open" when cached would keep showing as open for the rest of the cache's life even after closing. Fixed by always recomputing from the cached `opening_hours` string at read time.
+2. A live Nominatim connection timeout during testing produced an unhandled 500 instead of a graceful message — network failures now raise a distinct `VenueProviderUnavailableError`, caught and shown as a friendly "temporarily unavailable, try again" rather than crashing the page.
+
+Also caught mid-testing: the placeholder text's own suggested query format ("Sandton, Johannesburg") resolves far less precisely in Nominatim than the plain suburb name — fixed the copy after confirming with real geocode calls.
+
+Verified end-to-end against the live public services near Sandton, Johannesburg: real venue names/addresses, correct distance sorting, the open-now filter genuinely excluding closed places, a cached repeat search dropping from ~4s to ~130ms, and graceful handling of both a not-found place and a simulated outage.
+
 ---
 
 ## 9. Decisions Log
