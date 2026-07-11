@@ -238,6 +238,14 @@ Verified end-to-end against the live database: full decline path, full accept pa
 
 Rate limiting on these public write endpoints is intentionally still deferred to Milestone 7, as originally scoped — not forgotten.
 
+### Milestone 4 — status: done
+
+Built: `notifications` table (owner-only RLS, added to the `supabase_realtime` publication via migration SQL — no dashboard toggle needed), a notification created on both accept *and* decline (the brief only names accept, but the sender benefits either way and it's the same write path — flagged as a deliberate small addition), and a live `NotificationBell` in the header — Realtime subscription, toast on arrival, unread badge that clears on open.
+
+Reads and the mark-as-read write go straight from the browser client, no server action needed — the existing owner-only RLS policies on `notifications` and `invitation_responses` (from Milestones 3) already permit exactly this from an authenticated session.
+
+**Real bug found and fixed during testing**: `@supabase/ssr`'s cookie-based browser client does not automatically forward the session JWT to the Realtime client the way the plain localStorage-based `@supabase/supabase-js` client does. Without an explicit `supabase.realtime.setAuth(session.access_token)` call, `postgres_changes` silently evaluates RLS as unauthenticated and delivers nothing — no error on either side, which made it genuinely hard to spot (the channel subscribes successfully, the row inserts successfully, nothing looks wrong until you watch the actual WebSocket frames). Fixed by calling `setAuth` on session load and on every `onAuthStateChange` event. Verified with a real two-browser-context test: recipient responds in one context, the sender's already-open tab updates live with no reload.
+
 ---
 
 ## 9. Decisions Log
