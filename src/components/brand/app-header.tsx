@@ -6,6 +6,7 @@ import { Heart, Inbox, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
 import { UserMenu } from "@/components/brand/user-menu";
+import { NotificationBell, type NotificationItem } from "@/components/brand/notification-bell";
 
 const TABS = [
   { href: "/create", label: "Create Invitation", icon: Heart },
@@ -14,11 +15,20 @@ const TABS = [
 ];
 
 export interface AppHeaderUser {
+  id: string;
   displayName: string;
   avatarMascotId: string;
 }
 
-export function AppHeader({ user }: { user: AppHeaderUser | null }) {
+export function AppHeader({
+  user,
+  notifications,
+  unreadCount,
+}: {
+  user: AppHeaderUser | null;
+  notifications: NotificationItem[];
+  unreadCount: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -49,7 +59,8 @@ export function AppHeader({ user }: { user: AppHeaderUser | null }) {
             );
           })}
         </nav>
-        <div className="shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
+          {user && <NotificationBell userId={user.id} initialNotifications={notifications} initialUnreadCount={unreadCount} />}
           {user && <UserMenu displayName={user.displayName} avatarMascotId={user.avatarMascotId} />}
         </div>
       </div>
