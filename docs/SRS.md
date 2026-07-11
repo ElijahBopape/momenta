@@ -218,6 +218,14 @@ Infrastructure: Supabase provisioned free-tier via the Vercel Marketplace integr
 
 Everything else — the account/session mechanics, RLS, the trigger, the protected routing — was verified directly against the real Supabase project (via the Admin API and a temporary confirmed test user, cleaned up after).
 
+### Milestone 2 — status: done
+
+Built: `invitations` table (owner-only RLS), the background/sticker registries (same parametric pattern as mascots), a shared `InvitationCard` component, and the builder itself — `/create` finds-or-creates one active draft per user, autosaves on a debounce, and shows a live preview next to the form. Sending validates the message, flips status to `pending`, stamps `sent_at`, generates the share link, and shows a "create another" path back into a fresh draft. `/invitations` lists everything (draft and sent) with an icon+text status badge and links through to a read-only detail view with the share link.
+
+One deliberate simplification vs. a literal reading of the SRS: **one active draft per user**, not many concurrent drafts — landing on `/create` always resumes the same in-progress invitation rather than requiring a draft picker. Verified end-to-end against the live database (autosave persists, send transitions the row, history and detail pages reflect it immediately, a fresh draft appears on the next visit).
+
+The share link shown after sending (`/i/{share_token}`) doesn't resolve yet — the public recipient page is Milestone 3 — the UI says so explicitly rather than implying it's live.
+
 ---
 
 ## 9. Decisions Log
