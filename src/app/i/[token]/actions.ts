@@ -24,7 +24,7 @@ export async function declineInvitation(token: string, recipientName: string, de
     .update({ status: "declined", recipient_name: parsedName.data, updated_at: new Date().toISOString() })
     .eq("share_token", token)
     .eq("status", "pending")
-    .select("id")
+    .select("id, owner_id")
     .maybeSingle();
 
   if (updateError) {
@@ -41,6 +41,15 @@ export async function declineInvitation(token: string, recipientName: string, de
   });
   if (insertError) {
     console.error("invitation_responses insert failed after decline", insertError);
+  }
+
+  const { error: notifyError } = await admin.from("notifications").insert({
+    user_id: updated.owner_id,
+    invitation_id: updated.id,
+    type: "declined",
+  });
+  if (notifyError) {
+    console.error("notification insert failed after decline", notifyError);
   }
 
   return { ok: true };
@@ -71,7 +80,7 @@ export async function acceptInvitation(token: string, input: z.infer<typeof acce
     .update({ status: "accepted", recipient_name: parsed.data.recipientName, updated_at: new Date().toISOString() })
     .eq("share_token", token)
     .eq("status", "pending")
-    .select("id")
+    .select("id, owner_id")
     .maybeSingle();
 
   if (updateError) {
@@ -91,6 +100,15 @@ export async function acceptInvitation(token: string, input: z.infer<typeof acce
   });
   if (insertError) {
     console.error("invitation_responses insert failed after accept", insertError);
+  }
+
+  const { error: notifyError } = await admin.from("notifications").insert({
+    user_id: updated.owner_id,
+    invitation_id: updated.id,
+    type: "accepted",
+  });
+  if (notifyError) {
+    console.error("notification insert failed after accept", notifyError);
   }
 
   return { ok: true };
