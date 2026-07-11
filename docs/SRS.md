@@ -228,6 +228,16 @@ One deliberate simplification vs. a literal reading of the SRS: **one active dra
 
 The share link shown after sending (`/i/{share_token}`) doesn't resolve yet — the public recipient page is Milestone 3 — the UI says so explicitly rather than implying it's live.
 
+### Milestone 3 — status: done
+
+Built: `invitation_responses` table (RLS: owner-readable via join, no anon/authenticated write policy at all — every write goes through `src/lib/supabase/admin.ts`, a service-role client used exclusively by this route), the activities registry (full list from the brief), and `/i/[token]` itself — name capture, the ask, the two-step decline (playful pushback, confirm), and accept (activity → date → time → confetti celebration). A "how many times they said no" counter carries from a decline-then-change-of-heart into the eventual accept.
+
+Both `declineInvitation` and `acceptInvitation` do a single atomic `UPDATE invitations SET status=... WHERE share_token=... AND status='pending' RETURNING id` — this is the entire idempotency/race guard (R3), and it doubles as the "already answered" check with no separate read-then-write race window. Revisiting an answered link renders a read-only summary instead of replaying the interactive flow (R4); GET never mutates, so link-preview bots are inert (R2).
+
+Verified end-to-end against the live database: full decline path, full accept path (including a decline → change-of-heart → accept that correctly carried the decline count), revisiting an already-answered link, an invalid token, and the sender's `/invitations` list/detail correctly showing the recipient's own name and the real activity/date/time once answered. No mobile layout issues found.
+
+Rate limiting on these public write endpoints is intentionally still deferred to Milestone 7, as originally scoped — not forgotten.
+
 ---
 
 ## 9. Decisions Log
