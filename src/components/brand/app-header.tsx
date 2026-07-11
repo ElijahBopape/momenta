@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Heart, Inbox, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
+import { UserMenu } from "@/components/brand/user-menu";
 
 const TABS = [
   { href: "/create", label: "Create Invitation", icon: Heart },
@@ -12,7 +13,12 @@ const TABS = [
   { href: "/find-a-spot", label: "Find a Spot", icon: MapPin },
 ];
 
-export function AppHeader() {
+export interface AppHeaderUser {
+  displayName: string;
+  avatarMascotId: string;
+}
+
+export function AppHeader({ user }: { user: AppHeaderUser | null }) {
   const pathname = usePathname();
 
   return (
@@ -43,6 +49,7 @@ export function AppHeader() {
             );
           })}
         </nav>
+        {user && <UserMenu displayName={user.displayName} avatarMascotId={user.avatarMascotId} />}
       </div>
     </header>
   );
