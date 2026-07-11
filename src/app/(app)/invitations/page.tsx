@@ -22,6 +22,16 @@ export default async function InvitationsPage() {
 
   const sortable = (invitations ?? []).filter((i) => !(i.status === "draft" && !i.title && !i.recipient_name));
 
+  const answeredIds = sortable.filter((i) => i.status !== "draft" && i.status !== "pending").map((i) => i.id);
+  const responseNames = new Map<string, string>();
+  if (answeredIds.length > 0) {
+    const { data: responses } = await supabase
+      .from("invitation_responses")
+      .select("invitation_id, recipient_name")
+      .in("invitation_id", answeredIds);
+    for (const r of responses ?? []) responseNames.set(r.invitation_id, r.recipient_name);
+  }
+
   if (sortable.length === 0) {
     return (
       <ComingSoon
@@ -41,25 +51,26 @@ export default async function InvitationsPage() {
       </div>
 
       <ul className="space-y-3">
-        {sortable.map((invitation) => (
-          <li key={invitation.id}>
-            <Link
-              href={invitation.status === "draft" ? "/create" : `/invitations/${invitation.id}`}
-              className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-muted/50"
-            >
-              <Mascot species={invitation.design.mascotId} mood="happy" className="h-14 w-auto shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">
-                  {invitation.recipient_name || invitation.title || "Untitled invitation"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {invitation.sent_at ? `Sent ${formatDate(invitation.sent_at)}` : `Created ${formatDate(invitation.created_at)}`}
-                </p>
-              </div>
-              <StatusBadge status={invitation.status} />
-            </Link>
-          </li>
-        ))}
+        {sortable.map((invitation) => {
+          const displayName = responseNames.get(invitation.id) || invitation.recipient_name;
+          return (
+            <li key={invitation.id}>
+              <Link
+                href={invitation.status === "draft" ? "/create" : `/invitations/${invitation.id}`}
+                className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-muted/50"
+              >
+                <Mascot species={invitation.design.mascotId} mood="happy" className="h-14 w-auto shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{displayName || invitation.title || "Untitled invitation"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {invitation.sent_at ? `Sent ${formatDate(invitation.sent_at)}` : `Created ${formatDate(invitation.created_at)}`}
+                  </p>
+                </div>
+                <StatusBadge status={invitation.status} />
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
