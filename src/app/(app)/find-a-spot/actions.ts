@@ -4,6 +4,8 @@ import { z } from "zod";
 import { getVenueSearchProvider } from "@/lib/venues/osm-provider";
 import { ACTIVITIES } from "@/design/activities";
 import { VenueProviderUnavailableError, type Venue } from "@/lib/venues/types";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { createClient } from "@/lib/supabase/server";
 
 const activityIds = ACTIVITIES.map((a) => a.id) as [string, ...string[]];
 
@@ -20,6 +22,19 @@ export type SearchResult = { ok: true; locationName: string; venues: Venue[] } |
 const UNAVAILABLE_MESSAGE = "The map search is temporarily unavailable — it's a free public service, so this happens occasionally. Try again in a moment.";
 
 export async function searchVenues(input: SearchInput): Promise<SearchResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Log in to search." };
+  }
+
+  const allowed = await checkRateLimit(`find-a-spot:${user.id}`, 20, 10 * 60 * 1000);
+  if (!allowed) {
+    return { ok: false, error: "Too many searches — wait a few minutes and try again." };
+  }
+
   const parsed = searchSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
