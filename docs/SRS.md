@@ -1,0 +1,224 @@
+# Momenta — Software Requirements Specification
+
+Status: Draft v1.0 — awaiting approval before Milestone 1 begins
+Owner: Product/Eng (you) + AI technical lead (this document)
+Related: [Brand system artifact](https://claude.ai/code/artifact/c23374c7-ba52-4470-b26c-042a45ef1701) — logo, palette, type, 8-animal plush companion family
+
+---
+
+## 1. Product Vision
+
+Momenta turns "asking someone out" into a small, shareable moment instead of a text message. A sender builds a personalized invitation card (mascot companion, message, theme), sends a link, and the recipient responds through a playful, low-stakes interaction (including a funny decline loop) that — if accepted — collects a date, time, and activity, finds a venue, checks the weather, and drops it on a calendar. No app install required for the recipient.
+
+Design principle carried through every decision below: **the sender needs an account; the recipient never does.** That asymmetry is the hardest constraint in the system and shapes auth, security, and data model choices throughout.
+
+---
+
+## 2. Scope
+
+### 2.1 In scope for MVP (from brief, confirmed)
+Auth (Supabase), profiles, invitation builder, shareable public invitations, decline-loop, accept flow (date/time/activity), sender notifications, invitation history, Find a Spot (Google Maps), calendar export (.ics), weather.
+
+### 2.2 Recommended additions
+These aren't in the original brief but are cheap now and expensive to retrofit later. Flagged individually so you can accept/reject each:
+
+| Addition | Why | Cost to add now |
+|---|---|---|
+| Public share token distinct from row ID | Prevents guessing/enumerating other people's invitations (IDOR) | Trivial — one column |
+| Plain-text + emoji/sticker messages only, no rich HTML | The personal message is user content rendered to a stranger with no auth wall — the single biggest XSS surface in the app. Removing HTML removes the risk class entirely | Trivial — it's the natural builder UX anyway |
+| Response idempotency + status-transition guard | Recipient can open the link twice (two tabs, link preview bots) — without this, "declined" can silently flip back to "pending" | Small — one server-side check |
+| Supabase Realtime on notifications | "Sender sees it immediately" is in the spec; polling can't do that cheaply, Realtime can | Small, same DB table either way |
+| Venue result caching | Google Places is billed per call; caching identical searches for a few hours is the difference between a $20 and $200 month at moderate traffic | Small — one table or KV |
+| Basic rate limiting on the public respond endpoint | Public, unauthenticated, mutating endpoint — an obvious spam/abuse target | Small |
+| Error tracking (Sentry or Vercel Observability) | You will not find out about production bugs from users of a dating-adjacent app — they'll just leave | Small, one integration |
+
+### 2.3 Explicitly deferred (confirm you agree)
+- Animations/music on invitations (already marked future in brief)
+- Email/push notifications (in-app only for MVP, per brief)
+- Google/Apple Calendar live sync (`.ics` only for MVP, per brief)
+- Admin-managed mascot/activity catalog (both ship as versioned code config, not DB tables, for MVP — see §6.4)
+- Recipient identity verification ("prove you're actually the person invited") — see Risk R1
+
+---
+
+## 3. Personas
+
+**Sender** — has an account, initiates. Wants the ask to feel thoughtful without much effort, wants to know the moment it's answered.
+
+**Recipient** — no account, arrives via link (usually from a messaging app). Wants the card to load fast, feel obviously personal (not spam), and be trivially easy to respond to on a phone.
+
+---
+
+## 4. Functional Requirements
+
+### 4.1 Authentication
+- Email + password signup via Supabase Auth; verification email required before an account can send invitations (read-only/builder-draft access is fine pre-verification).
+- Login, logout, password reset (Supabase-hosted flows, styled to match brand).
+- No credential storage of our own — Supabase Auth owns hashing, tokens, sessions.
+
+### 4.2 Profiles
+- `display_name`, `email` (from auth), avatar (future — placeholder mascot avatar in MVP, see §6.4), account settings page (change display name, password reset trigger, delete account).
+
+### 4.3 Invitation Builder
+- Fields: title, personal message (plain text + emoji, length-capped), recipient name *(optional pre-fill only — see §4.4)*, mascot companion (one of 8, expandable), mood, background/palette theme, sticker decorations (fixed catalog).
+- Draft autosave (row created on first edit with `status = draft`, not yet a live link).
+- "Send" action: generates the public share token, flips status to `pending`, becomes read-only to the sender except for resending the link.
+
+### 4.4 Sending / Public Access
+- Public URL: `momenta-web.vercel.app/i/{share_token}` — token is a random ~24-char nanoid, not the row's primary key, not sequential.
+- No auth required to view or respond.
+- Page must be safe to prefetch: link-preview bots (iMessage, WhatsApp, Slack) will `GET` the URL to generate a preview — rendering must have zero side effects. All state changes are explicit `POST`s from a user click, never encoded in the URL itself.
+- **Recipient name capture**: the first screen the recipient sees asks their name before showing the ask ("What should we call you?"). If the sender already pre-filled a guess, it's offered as a one-tap confirm, editable. The recipient-entered name is the value of record from that point forward — used in the greeting ("Hey {name} 👋"), the decline-loop copy, and the sender's notification/history views. This is what lets Momenta address the recipient correctly even when the sender only knew a nickname or got it wrong.
+
+### 4.5 Decline Flow
+- First "Decline" press → intercepted client-side, shows one of several playful reconsideration lines (not a real decline yet), mascot mood switches to `smirk`.
+- Second press on the (re-labeled) decline → recorded as a real decline, status → `declined`, sender notified.
+- Reject copy list is data-driven (array), easy to extend; no repeat line twice in a row (already prototyped in the brand artifact).
+
+### 4.6 Accept Flow
+- On accept: recipient picks activity (from expandable catalog), date, time.
+- Writes an `invitation_responses` row; invitation status → `accepted`.
+- Leads into Find a Spot (optional, can be skipped) and calendar export.
+
+### 4.7 Sender Notifications
+- In-app notification the moment a recipient responds (Realtime push, not polled), surfaced as a badge + notification list.
+- Notification includes: recipient name, outcome, activity, date, time, and links to the full invitation.
+
+### 4.8 Invitation History
+- List of all invitations the sender created: recipient, created date, status (pending/accepted/declined — visually distinct, not color-only, for accessibility), and — once answered — activity/date/time.
+- Click through to reopen full detail.
+
+### 4.9 Find a Spot
+- Filters: city, radius, price range, category, minimum rating, open-now.
+- Results: name, rating, review count, price level, address, distance, hours, photos, directions link.
+- All pricing shown in **South African Rand (R)** — Google's `priceLevel` (an 0–4 enum, not a currency amount) is mapped to an R-denominated band label (e.g. "R · Budget" … "R R R R · Splurge") rather than displayed as raw `$` symbols.
+- Built behind a `VenueSearchProvider` interface (see §6.3) — Google Places is the first implementation, not a hard dependency baked through the UI layer.
+
+### 4.10 Calendar
+- `.ics` generation and download for the confirmed plan (venue, date, time) — same approach already proven in the example project's `downloadICS()`, generalized.
+
+### 4.11 Weather
+- Forecast, temperature, rain probability, icon for the confirmed venue + date.
+- Provider: **Open-Meteo** — no API key, no billing, generous rate limits, sufficient accuracy for a "should I bring a jacket" widget. Revisit only if a future feature needs alerting or minutely data OpenWeatherMap/Tomorrow.io would justify a paid key for.
+
+### 4.12 Navigation
+Three tabs: **Create Invitation**, **Invitations**, **Find a Spot** — persistent app shell, mobile-first (most recipients and a fair share of senders will be on phones).
+
+---
+
+## 5. Non-Functional Requirements
+
+- **Security**: RLS on every table; public data exposed only through narrow, purpose-built read paths (never a raw table select to `anon`); no HTML rendering of user content; rate-limited public mutation endpoints.
+- **Performance**: public invitation page should be fast on mobile networks — mascots are SVG (already true in the brand system), no heavy client bundles gating first paint.
+- **Accessibility**: WCAG AA contrast, status conveyed by icon+text not color alone, keyboard-operable builder and picker components (already true in the brand artifact's mascot picker).
+- **Cost control**: this project runs on **0 capital** — every service must have a genuinely free tier the MVP can live on indefinitely, not just a trial. Confirmed free: Supabase (free project tier), Vercel (Hobby), Open-Meteo (no key, no billing), GitHub. Google Maps Platform is the one exception worth flagging now — see Risk R10.
+- **Portability**: Google Maps and weather both sit behind interfaces so a provider swap is a new adapter, not a rewrite.
+
+---
+
+## 6. System Architecture
+
+### 6.1 Stack (confirmed from brief)
+Next.js (App Router) + TypeScript + Tailwind + shadcn/ui · Supabase (Postgres, Auth, Storage, Realtime) · Vercel hosting · Google Maps Platform · Open-Meteo.
+
+### 6.2 Layering (clean architecture)
+
+```
+src/
+  domain/            # entities, types, pure business rules — no framework imports
+    invitation.ts
+    response.ts
+    mascot.ts
+  application/        # use-cases: orchestrate domain + ports, framework-agnostic
+    create-invitation.ts
+    respond-to-invitation.ts
+    search-venues.ts
+  infrastructure/      # adapters implementing application ports
+    supabase/          # repositories: InvitationRepository, ProfileRepository...
+    google-places/      # VenueSearchProvider implementation
+    open-meteo/          # WeatherProvider implementation
+    ics/                  # calendar file generator
+  app/                    # Next.js routes — thin, call application layer only
+    (marketing)/
+    (app)/create/  invitations/  find-a-spot/
+    i/[token]/               # public recipient experience
+    api/                     # route handlers for public/webhook-style endpoints
+  components/                # presentational, brand-system components (mascots, cards, buttons)
+  design/                     # tokens ported from the brand artifact (palette, type, mascot registry)
+```
+
+Rule: `app/` and `components/` depend on `application/`; `application/` depends on `domain/` and *interfaces* defined in `domain/` or `application`, never directly on `infrastructure/` — infrastructure is injected. This is what makes "replace Google Maps later" or "swap Supabase" a contained change instead of a rewrite.
+
+### 6.3 Provider abstractions (why)
+`VenueSearchProvider` and `WeatherProvider` are interfaces with one method each (`search(...)`, `getForecast(...)`). Google Places and Open-Meteo are the only implementations today, but nothing above the `infrastructure/` layer imports their SDKs directly. This directly satisfies the brief's "design so Google APIs can later be replaced."
+
+### 6.4 Mascots & activities: code config, not database, for MVP
+Both are small, curated, change rarely, and ship with the app. Modeling them as a typed registry (exactly the `SPECIES` array pattern already built in the brand artifact) gets 90% of "modular/expandable" for near-zero complexity. Moving either to an admin-editable DB table is a clean, isolated future milestone if you later want non-engineers adding animals or activities without a deploy — not needed for MVP.
+
+### 6.5 Data model
+
+| Table | Key columns | Notes |
+|---|---|---|
+| `profiles` | `id (fk auth.users)`, `display_name`, `avatar_mascot_id`, `created_at` | 1:1 with Supabase Auth user |
+| `invitations` | `id`, `owner_id`, `share_token (unique)`, `recipient_name`, `title`, `message`, `design (jsonb)`, `status`, `created_at`, `expires_at` | `design` holds `{mascotId, mood, palette, background, stickers[]}` — versioned JSON so the theme engine can evolve without migrations |
+| `invitation_responses` | `id`, `invitation_id (fk)`, `recipient_name`, `activity`, `response_date`, `response_time`, `decline_count`, `responded_at` | One row per invitation, written server-side only. `recipient_name` is captured from the recipient directly (§4.4) and is the name of record for notifications/history, overriding the sender's guess on `invitations.recipient_name` |
+| `notifications` | `id`, `user_id (fk)`, `invitation_id (fk)`, `type`, `read_at`, `created_at` | Realtime-subscribed by the app shell |
+| `venue_cache` | `id`, `place_id`, `payload (jsonb)`, `fetched_at`, `expires_at` | TTL cache in front of Google Places to control cost |
+
+### 6.6 Row Level Security posture
+- `profiles`, `invitations`, `notifications`: owner-only `select`/`update` (`auth.uid() = owner_id`). No `anon` access to these tables at all.
+- Public invitation reads happen through a dedicated server-side read (Route Handler or RPC) that looks up by `share_token` and returns only the fields the recipient screen needs — never a client-side `select *` against `invitations`.
+- `invitation_responses` inserts happen only through a server-side function that also (a) checks the invitation is still `pending`, (b) is idempotent per invitation, (c) is rate-limited. Never a direct client insert.
+
+### 6.7 Branding wired at the architecture level
+Palette, type stack, and the mascot SVG generator from the brand artifact become `design/tokens.ts` and `design/mascots.ts` in Milestone 1 — every screen after that consumes them rather than hardcoding colors, so the whole site stays visually consistent by construction, not by convention.
+
+---
+
+## 7. Risks & Edge Cases
+
+| ID | Risk | Mitigation |
+|---|---|---|
+| R1 | Anyone with the link can respond — not verified as the actual invitee (link forwarded/screenshotted) | Accepted for MVP given the product's informal, low-friction nature; flag as a conscious trade-off, revisit only if abuse shows up |
+| R2 | Link-preview bots (iMessage/WhatsApp) prefetching the URL could trigger state changes if not careful | All mutations are explicit POST from user interaction; `GET` is side-effect-free (§4.4) |
+| R3 | Double-response race (two tabs, slow network double-tap) | Idempotent, status-guarded response write (§6.6) |
+| R4 | Reopening an already-answered link should show the final state, not replay the interactive flow | Server checks `status` before rendering the ask/decline screens |
+| R5 | Google Places cost overrun under real traffic | `venue_cache` TTL cache + query throttling; set a GCP budget alert regardless |
+| R6 | Stored XSS via the personal message field, shown to an unauthenticated stranger | Plain text + emoji + fixed sticker catalog only — no HTML ever rendered from user input |
+| R7 | Spam account creation used to blast invitations | Email verification gate before send is enabled |
+| R8 | Unbounded invitation lifetime (a link is valid forever) | Recommend `expires_at` (e.g. 30 days unanswered) — **open question, needs your call**, see §9 |
+| R9 | Accessibility: playful palette (pink/gold) failing contrast on status indicators | Status shown with icon + text, not color alone; contrast-check gold-on-light combos specifically |
+| R10 | **Google Maps Platform requires a billing-enabled Google Cloud account (card on file) even to use its free monthly credit** — this conflicts with the 0-capital constraint if a card genuinely isn't available | Not a blocker for Milestones 1–4 (auth, builder, response flow, notifications need no maps). Decide before Milestone 5: (a) add a card and rely on the free credit + our caching/throttling to stay at R0, or (b) swap `VenueSearchProvider` to a no-card-required alternative (e.g. OpenStreetMap/Nominatim + Overpass, or Geoapify's free tier) — the provider-interface architecture in §6.3 makes this a contained swap either way |
+
+---
+
+## 8. Milestones
+
+Each milestone is independently demoable, endable in its own commit(s), and pushed before the next begins — per the workflow in your brief (explain → design → build → test → commit → push → then move on).
+
+| # | Milestone | Delivers | Exit criteria |
+|---|---|---|---|
+| 1 | **Foundations & Auth** | Repo scaffold (Next.js/TS/Tailwind/shadcn), brand tokens + mascot registry ported from the artifact, Supabase project + schema + RLS, signup/login/logout/verify/reset, app shell with the 3 nav tabs stubbed | New user can sign up, verify, log in, see empty app shell, log out |
+| 2 | **Invitation Builder & History** | `invitations` table, builder UI (mascot/theme/message), draft save, send → generates share token, Invitations list page | Sender builds and sends a real invitation, sees it in history as pending |
+| 3 | **Public Invitation & Response Flow** | `/i/[token]` public page, decline loop, accept flow (activity/date/time), `invitation_responses` writes | A logged-out browser can open the link and accept or decline; status updates correctly |
+| 4 | **Sender Notifications** | `notifications` table + Realtime, in-app badge/list, invitation detail view | Sender sees a live notification the moment the recipient responds, no refresh needed |
+| 5 | **Find a Spot** | `VenueSearchProvider` + Google Places adapter, filters UI, results list/map, `venue_cache` | Sender can search, filter, and view real venues near a city |
+| 6 | **Calendar & Weather** | `.ics` export, Open-Meteo `WeatherProvider`, wired into the accept/celebration screen | Confirmed plan shows live weather and downloads a valid calendar file |
+| 7 | **Hardening & Launch Readiness** | Rate limiting, RLS audit, accessibility pass, OG tags for share links, error tracking, empty/error states | App is safe to share publicly at small scale |
+
+---
+
+## 9. Decisions Log
+
+| # | Decision | Resolution |
+|---|---|---|
+| D1 | Source of truth repo | `https://github.com/ElijahBopape/momenta.git` |
+| D2 | Currency | All prices shown in ZAR (R), never $ |
+| D3 | Budget | 0 capital — free-tier-only services; Google Maps billing conflict flagged as R10, deferred to Milestone 5 |
+| D4 | Recipient naming | Recipient supplies/confirms their own name at the start of the public flow (§4.4); it becomes the name of record |
+
+## 10. Open Questions (need your decision before Milestone 5 / as they come up)
+
+1. Should invitations expire if unanswered (R8)? If yes, what's the default — 30 days?
+2. Any real venue/city constraint for MVP (brief's example project was Johannesburg-specific) — worldwide from day one, or launch scoped to one city/region?
+3. Google Cloud billing for Maps (R10) — add a card, or use a no-card alternative provider?
