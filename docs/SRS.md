@@ -259,6 +259,16 @@ Also caught mid-testing: the placeholder text's own suggested query format ("San
 
 Verified end-to-end against the live public services near Sandton, Johannesburg: real venue names/addresses, correct distance sorting, the open-now filter genuinely excluding closed places, a cached repeat search dropping from ~4s to ~130ms, and graceful handling of both a not-found place and a simulated outage.
 
+### Milestone 6 — status: done
+
+Built: `buildIcs`/`downloadIcs` (RFC5545, reused on both the recipient's celebration screen and the sender's accepted-invitation detail page) and a `WeatherProvider` backed by Open-Meteo. No venue is tied to a plan yet (Find a Spot is still a standalone tool, not connected to a specific invitation — an open item for later, not a bug), so weather uses whoever is currently viewing the page as the coordinate, requested only on explicit click rather than an automatic geolocation permission prompt on load.
+
+Two real bugs found and fixed before shipping:
+1. The recipient's calendar event defaulted to "with {recipientName}" — on their own screen that literally names themselves. Fixed to a plain activity summary there; "with {name}" stays correct on the sender's side only.
+2. `buildIcs` assumed time was always `"HH:MM"` (matching the accept flow's `<input type="time">`) and unconditionally appended `:00`. Postgres returns its `time` column as `"HH:MM:SS"`, which the sender's detail page reads directly — producing `"14:00:00:00"` and an unhandled crash on click. Didn't surface locally until testing the sender's page specifically, since every path tried before that happened to use the shorter format. Now normalizes either format and the button catches failures with a toast instead of an unhandled exception.
+
+Verified end-to-end with real Open-Meteo data for Johannesburg, a real downloaded `.ics` file (correct RFC5545 structure, correct UTC conversion from SAST), both the recipient and sender flows, and the geolocation-denied path failing gracefully rather than hanging.
+
 ---
 
 ## 9. Decisions Log
