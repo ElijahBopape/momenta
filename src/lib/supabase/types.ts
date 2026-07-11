@@ -137,6 +137,30 @@ export interface Database {
         };
         Relationships: [];
       };
+      venue_cache: {
+        Row: {
+          id: string;
+          cache_key: string;
+          payload: unknown;
+          fetched_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          cache_key: string;
+          payload: unknown;
+          fetched_at?: string;
+          expires_at: string;
+        };
+        Update: {
+          id?: string;
+          cache_key?: string;
+          payload?: unknown;
+          fetched_at?: string;
+          expires_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
