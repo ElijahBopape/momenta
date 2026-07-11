@@ -69,6 +69,47 @@ export interface Database {
         };
         Relationships: [];
       };
+      invitation_responses: {
+        Row: {
+          id: string;
+          invitation_id: string;
+          recipient_name: string;
+          activity: string | null;
+          response_date: string | null;
+          response_time: string | null;
+          decline_count: number;
+          responded_at: string;
+        };
+        Insert: {
+          id?: string;
+          invitation_id: string;
+          recipient_name: string;
+          activity?: string | null;
+          response_date?: string | null;
+          response_time?: string | null;
+          decline_count?: number;
+          responded_at?: string;
+        };
+        Update: {
+          id?: string;
+          invitation_id?: string;
+          recipient_name?: string;
+          activity?: string | null;
+          response_date?: string | null;
+          response_time?: string | null;
+          decline_count?: number;
+          responded_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invitation_responses_invitation_id_fkey";
+            columns: ["invitation_id"];
+            isOneToOne: true;
+            referencedRelation: "invitations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
