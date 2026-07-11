@@ -17,7 +17,7 @@ Design principle carried through every decision below: **the sender needs an acc
 ## 2. Scope
 
 ### 2.1 In scope for MVP (from brief, confirmed)
-Auth (Supabase), profiles, invitation builder, shareable public invitations, decline-loop, accept flow (date/time/activity), sender notifications, invitation history, Find a Spot (Google Maps), calendar export (.ics), weather.
+Auth (Supabase), profiles, invitation builder, shareable public invitations, decline-loop, accept flow (date/time/activity), sender notifications, invitation history, Find a Spot (OpenStreetMap — see D5), calendar export (.ics), weather.
 
 ### 2.2 Recommended additions
 These aren't in the original brief but are cheap now and expensive to retrofit later. Flagged individually so you can accept/reject each:
@@ -28,7 +28,7 @@ These aren't in the original brief but are cheap now and expensive to retrofit l
 | Plain-text + emoji/sticker messages only, no rich HTML | The personal message is user content rendered to a stranger with no auth wall — the single biggest XSS surface in the app. Removing HTML removes the risk class entirely | Trivial — it's the natural builder UX anyway |
 | Response idempotency + status-transition guard | Recipient can open the link twice (two tabs, link preview bots) — without this, "declined" can silently flip back to "pending" | Small — one server-side check |
 | Supabase Realtime on notifications | "Sender sees it immediately" is in the spec; polling can't do that cheaply, Realtime can | Small, same DB table either way |
-| Venue result caching | Google Places is billed per call; caching identical searches for a few hours is the difference between a $20 and $200 month at moderate traffic | Small — one table or KV |
+| Venue result caching | Nominatim/Overpass (OSM, see D5) are free but rate-limited fair-use public services; caching identical searches keeps us comfortably inside their limits and makes repeat searches fast | Small — one table |
 | Basic rate limiting on the public respond endpoint | Public, unauthenticated, mutating endpoint — an obvious spam/abuse target | Small |
 | Error tracking (Sentry or Vercel Observability) | You will not find out about production bugs from users of a dating-adjacent app — they'll just leave | Small, one integration |
 
@@ -92,7 +92,7 @@ These aren't in the original brief but are cheap now and expensive to retrofit l
 - Filters: city, radius, price range, category, minimum rating, open-now.
 - Results: name, rating, review count, price level, address, distance, hours, photos, directions link.
 - All pricing shown in **South African Rand (R)** — Google's `priceLevel` (an 0–4 enum, not a currency amount) is mapped to an R-denominated band label (e.g. "R · Budget" … "R R R R · Splurge") rather than displayed as raw `$` symbols.
-- Built behind a `VenueSearchProvider` interface (see §6.3) — Google Places is the first implementation, not a hard dependency baked through the UI layer.
+- Built behind a `VenueSearchProvider` interface (see §6.3) — OpenStreetMap (Nominatim geocoding + Overpass venue search, see D5) is the implementation, not a hard dependency baked through the UI layer.
 
 ### 4.10 Calendar
 - `.ics` generation and download for the confirmed plan (venue, date, time) — same approach already proven in the example project's `downloadICS()`, generalized.
@@ -111,15 +111,15 @@ Three tabs: **Create Invitation**, **Invitations**, **Find a Spot** — persiste
 - **Security**: RLS on every table; public data exposed only through narrow, purpose-built read paths (never a raw table select to `anon`); no HTML rendering of user content; rate-limited public mutation endpoints.
 - **Performance**: public invitation page should be fast on mobile networks — mascots are SVG (already true in the brand system), no heavy client bundles gating first paint.
 - **Accessibility**: WCAG AA contrast, status conveyed by icon+text not color alone, keyboard-operable builder and picker components (already true in the brand artifact's mascot picker).
-- **Cost control**: this project runs on **0 capital** — every service must have a genuinely free tier the MVP can live on indefinitely, not just a trial. Confirmed free: Supabase (free project tier), Vercel (Hobby), Open-Meteo (no key, no billing), GitHub. Google Maps Platform is the one exception worth flagging now — see Risk R10.
-- **Portability**: Google Maps and weather both sit behind interfaces so a provider swap is a new adapter, not a rewrite.
+- **Cost control**: this project runs on **0 capital** — every service must have a genuinely free tier the MVP can live on indefinitely, not just a trial. Confirmed free, no card required anywhere: Supabase (free project tier), Vercel (Hobby), Open-Meteo (no key, no billing), OpenStreetMap/Nominatim/Overpass (no key, no billing), GitHub.
+- **Portability**: venue search and weather both sit behind interfaces so a provider swap is a new adapter, not a rewrite.
 
 ---
 
 ## 6. System Architecture
 
 ### 6.1 Stack (confirmed from brief)
-Next.js (App Router) + TypeScript + Tailwind + shadcn/ui · Supabase (Postgres, Auth, Storage, Realtime) · Vercel hosting · Google Maps Platform · Open-Meteo.
+Next.js (App Router) + TypeScript + Tailwind + shadcn/ui · Supabase (Postgres, Auth, Storage, Realtime) · Vercel hosting · OpenStreetMap (Nominatim + Overpass) · Open-Meteo.
 
 ### 6.2 Layering (clean architecture)
 
@@ -135,7 +135,7 @@ src/
     search-venues.ts
   infrastructure/      # adapters implementing application ports
     supabase/          # repositories: InvitationRepository, ProfileRepository...
-    google-places/      # VenueSearchProvider implementation
+    openstreetmap/       # VenueSearchProvider implementation (Nominatim + Overpass)
     open-meteo/          # WeatherProvider implementation
     ics/                  # calendar file generator
   app/                    # Next.js routes — thin, call application layer only
@@ -147,10 +147,10 @@ src/
   design/                     # tokens ported from the brand artifact (palette, type, mascot registry)
 ```
 
-Rule: `app/` and `components/` depend on `application/`; `application/` depends on `domain/` and *interfaces* defined in `domain/` or `application`, never directly on `infrastructure/` — infrastructure is injected. This is what makes "replace Google Maps later" or "swap Supabase" a contained change instead of a rewrite.
+Rule: `app/` and `components/` depend on `application/`; `application/` depends on `domain/` and *interfaces* defined in `domain/` or `application`, never directly on `infrastructure/` — infrastructure is injected. This is what makes "swap the venue search provider later" or "swap Supabase" a contained change instead of a rewrite.
 
 ### 6.3 Provider abstractions (why)
-`VenueSearchProvider` and `WeatherProvider` are interfaces with one method each (`search(...)`, `getForecast(...)`). Google Places and Open-Meteo are the only implementations today, but nothing above the `infrastructure/` layer imports their SDKs directly. This directly satisfies the brief's "design so Google APIs can later be replaced."
+`VenueSearchProvider` and `WeatherProvider` are interfaces with one method each (`search(...)`, `getForecast(...)`). OpenStreetMap (Nominatim + Overpass) and Open-Meteo are the only implementations today, but nothing above the `infrastructure/` layer imports their client code directly. This directly satisfies the brief's "design so [the venue] API can later be replaced" — originally written with Google Places in mind, now paying off in the other direction (free provider now, paid/richer provider later is equally contained if ever wanted).
 
 ### 6.4 Mascots & activities: code config, not database, for MVP
 Both are small, curated, change rarely, and ship with the app. Modeling them as a typed registry (exactly the `SPECIES` array pattern already built in the brand artifact) gets 90% of "modular/expandable" for near-zero complexity. Moving either to an admin-editable DB table is a clean, isolated future milestone if you later want non-engineers adding animals or activities without a deploy — not needed for MVP.
@@ -163,7 +163,7 @@ Both are small, curated, change rarely, and ship with the app. Modeling them as 
 | `invitations` | `id`, `owner_id`, `share_token (unique)`, `recipient_name`, `title`, `message`, `design (jsonb)`, `status`, `created_at`, `expires_at` | `design` holds `{mascotId, mood, palette, background, stickers[]}` — versioned JSON so the theme engine can evolve without migrations |
 | `invitation_responses` | `id`, `invitation_id (fk)`, `recipient_name`, `activity`, `response_date`, `response_time`, `decline_count`, `responded_at` | One row per invitation, written server-side only. `recipient_name` is captured from the recipient directly (§4.4) and is the name of record for notifications/history, overriding the sender's guess on `invitations.recipient_name` |
 | `notifications` | `id`, `user_id (fk)`, `invitation_id (fk)`, `type`, `read_at`, `created_at` | Realtime-subscribed by the app shell |
-| `venue_cache` | `id`, `place_id`, `payload (jsonb)`, `fetched_at`, `expires_at` | TTL cache in front of Google Places to control cost |
+| `venue_cache` | `id`, `cache_key`, `payload (jsonb)`, `fetched_at`, `expires_at` | TTL cache in front of Nominatim/Overpass to respect their fair-use rate limits and speed up repeat searches |
 
 ### 6.6 Row Level Security posture
 - `profiles`, `invitations`, `notifications`: owner-only `select`/`update` (`auth.uid() = owner_id`). No `anon` access to these tables at all.
@@ -183,12 +183,13 @@ Palette, type stack, and the mascot SVG generator from the brand artifact become
 | R2 | Link-preview bots (iMessage/WhatsApp) prefetching the URL could trigger state changes if not careful | All mutations are explicit POST from user interaction; `GET` is side-effect-free (§4.4) |
 | R3 | Double-response race (two tabs, slow network double-tap) | Idempotent, status-guarded response write (§6.6) |
 | R4 | Reopening an already-answered link should show the final state, not replay the interactive flow | Server checks `status` before rendering the ask/decline screens |
-| R5 | Google Places cost overrun under real traffic | `venue_cache` TTL cache + query throttling; set a GCP budget alert regardless |
+| R5 | Nominatim/Overpass are free public fair-use services (not paid, no SLA) — could rate-limit or degrade under real traffic | `venue_cache` TTL cache keeps repeat-query volume low; a proper identifying User-Agent header is sent per both services' usage policies; revisit a paid/self-hosted alternative only if usage genuinely outgrows fair-use |
 | R6 | Stored XSS via the personal message field, shown to an unauthenticated stranger | Plain text + emoji + fixed sticker catalog only — no HTML ever rendered from user input |
 | R7 | Spam account creation used to blast invitations | Email verification gate before send is enabled |
 | R8 | Unbounded invitation lifetime (a link is valid forever) | Recommend `expires_at` (e.g. 30 days unanswered) — **open question, needs your call**, see §9 |
 | R9 | Accessibility: playful palette (pink/gold) failing contrast on status indicators | Status shown with icon + text, not color alone; contrast-check gold-on-light combos specifically |
-| R10 | **Google Maps Platform requires a billing-enabled Google Cloud account (card on file) even to use its free monthly credit** — this conflicts with the 0-capital constraint if a card genuinely isn't available | Not a blocker for Milestones 1–4 (auth, builder, response flow, notifications need no maps). Decide before Milestone 5: (a) add a card and rely on the free credit + our caching/throttling to stay at R0, or (b) swap `VenueSearchProvider` to a no-card-required alternative (e.g. OpenStreetMap/Nominatim + Overpass, or Geoapify's free tier) — the provider-interface architecture in §6.3 makes this a contained swap either way |
+| R10 | ~~Google Maps Platform requires a billing-enabled Google Cloud account (card on file) even to use its free monthly credit~~ — **resolved via D5**: switched to OpenStreetMap, genuinely free, no card anywhere | Closed. Traded away ratings/review counts/price level/photos (OSM doesn't have this data) — recovered partially via an outbound "view on map" link per result to Google/Apple Maps for full details, at zero API cost |
+| R11 | OSM data completeness (opening hours, address detail) varies significantly by region — generally solid for Johannesburg/major-city areas, patchier elsewhere | Missing/unparseable `opening_hours` shown as "hours unknown" rather than guessed; no silent wrong answers |
 
 ---
 
@@ -202,7 +203,7 @@ Each milestone is independently demoable, endable in its own commit(s), and push
 | 2 | **Invitation Builder & History** | `invitations` table, builder UI (mascot/theme/message), draft save, send → generates share token, Invitations list page | Sender builds and sends a real invitation, sees it in history as pending |
 | 3 | **Public Invitation & Response Flow** | `/i/[token]` public page, decline loop, accept flow (activity/date/time), `invitation_responses` writes | A logged-out browser can open the link and accept or decline; status updates correctly |
 | 4 | **Sender Notifications** | `notifications` table + Realtime, in-app badge/list, invitation detail view | Sender sees a live notification the moment the recipient responds, no refresh needed |
-| 5 | **Find a Spot** | `VenueSearchProvider` + Google Places adapter, filters UI, results list/map, `venue_cache` | Sender can search, filter, and view real venues near a city |
+| 5 | **Find a Spot** | `VenueSearchProvider` + OpenStreetMap adapter (Nominatim geocoding, Overpass search), filters UI, results list (no embedded map — see D6), `venue_cache` | Sender can search, filter, and view real venues near a city, each linking out to Google/Apple Maps |
 | 6 | **Calendar & Weather** | `.ics` export, Open-Meteo `WeatherProvider`, wired into the accept/celebration screen | Confirmed plan shows live weather and downloads a valid calendar file |
 | 7 | **Hardening & Launch Readiness** | Rate limiting, RLS audit, accessibility pass, OG tags for share links, error tracking, empty/error states | App is safe to share publicly at small scale |
 
@@ -254,11 +255,12 @@ Reads and the mark-as-read write go straight from the browser client, no server 
 |---|---|---|
 | D1 | Source of truth repo | `https://github.com/ElijahBopape/momenta.git` |
 | D2 | Currency | All prices shown in ZAR (R), never $ |
-| D3 | Budget | 0 capital — free-tier-only services; Google Maps billing conflict flagged as R10, deferred to Milestone 5 |
+| D3 | Budget | 0 capital — free-tier-only services everywhere, no card on file anywhere |
 | D4 | Recipient naming | Recipient supplies/confirms their own name at the start of the public flow (§4.4); it becomes the name of record |
+| D5 | Venue search provider | OpenStreetMap (Nominatim + Overpass), not Google Places — resolves R10, keeps D3 intact. Traded away ratings/reviews/price level/photos (OSM has none of this); recovered partially via an outbound "view on map" link per result |
+| D6 | Find a Spot map display | Results list only, no embedded interactive map — each result links out to Google/Apple Maps instead. Avoids adding Leaflet + a map-tile provider signup for a v1 |
 
-## 10. Open Questions (need your decision before Milestone 5 / as they come up)
+## 10. Open Questions (need your decision as they come up)
 
 1. Should invitations expire if unanswered (R8)? If yes, what's the default — 30 days?
 2. Any real venue/city constraint for MVP (brief's example project was Johannesburg-specific) — worldwide from day one, or launch scoped to one city/region?
-3. Google Cloud billing for Maps (R10) — add a card, or use a no-card alternative provider?
