@@ -43,9 +43,9 @@ export function LogoMark({ className, dark = false }: { className?: string; dark
 
 export function Logo({ className, iconClassName }: { className?: string; iconClassName?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2 ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-1.5 sm:gap-2 ${className ?? ""}`}>
       <LogoMark className={iconClassName ?? "h-7 w-7"} />
-      <span className="font-display text-xl font-extrabold tracking-tight text-foreground">momenta</span>
+      <span className="font-display text-lg font-extrabold tracking-tight text-foreground sm:text-xl">momenta</span>
     </span>
   );
 }

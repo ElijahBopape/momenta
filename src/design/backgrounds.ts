@@ -9,31 +9,31 @@ export const BACKGROUNDS: BackgroundRecipe[] = [
   {
     id: "dawn",
     name: "Dawn",
-    cardBackground: "linear-gradient(165deg, #F3E8FF 0%, #FFFFFF 100%)",
+    cardBackground: "linear-gradient(160deg, #E4D2FF 0%, #F6EEFF 55%, #FFFFFF 100%)",
     textTone: "dark",
   },
   {
     id: "blossom",
     name: "Blossom",
-    cardBackground: "linear-gradient(165deg, #FFE7F1 0%, #FFFFFF 100%)",
+    cardBackground: "linear-gradient(160deg, #FFC9E1 0%, #FFEAF3 55%, #FFFFFF 100%)",
     textTone: "dark",
   },
   {
-    id: "sunshine",
-    name: "Sunshine",
-    cardBackground: "linear-gradient(165deg, #FFF3E2 0%, #FFFFFF 100%)",
+    id: "sunset",
+    name: "Sunset",
+    cardBackground: "linear-gradient(160deg, #FFC85C 0%, #FF9F6B 40%, #FFC9E1 100%)",
     textTone: "dark",
   },
   {
     id: "meadow",
     name: "Meadow",
-    cardBackground: "linear-gradient(165deg, #DFF7EC 0%, #F3E8FF 100%)",
+    cardBackground: "linear-gradient(160deg, #9CEFC6 0%, #DFF7EC 50%, #F3E8FF 100%)",
     textTone: "dark",
   },
   {
     id: "dusk",
     name: "Dusk",
-    cardBackground: "linear-gradient(165deg, #2A1145 0%, #6D28D9 100%)",
+    cardBackground: "linear-gradient(165deg, #2A1145 0%, #6D28D9 70%, #A855F7 100%)",
     textTone: "light",
   },
 ];

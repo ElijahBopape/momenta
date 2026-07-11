@@ -27,7 +27,7 @@ export function StickerPicker({ value, onChange }: { value: string[]; onChange: 
               aria-pressed={selected}
               aria-label={s.label}
               className={cn(
-                "flex size-10 items-center justify-center rounded-full border-2 text-lg transition-colors",
+                "flex size-11 items-center justify-center rounded-full border-2 text-lg transition-colors",
                 selected ? "border-primary bg-secondary" : "border-border hover:border-muted-foreground",
                 disabled && "opacity-40"
               )}
