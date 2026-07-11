@@ -86,9 +86,7 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
     }
   }
 
-  const shareUrl = sentToken
-    ? `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://momenta-web.vercel.app"}/i/${sentToken}`
-    : null;
+  const shareUrl = sentToken && typeof window !== "undefined" ? `${window.location.origin}/i/${sentToken}` : null;
 
   async function copyLink() {
     if (!shareUrl) return;
