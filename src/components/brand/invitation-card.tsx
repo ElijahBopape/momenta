@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Mascot } from "@/components/brand/mascot";
+import type { MascotMood } from "@/design/mascots";
 import { getBackground } from "@/design/backgrounds";
 import { getSticker } from "@/design/stickers";
 import { buildCustomGradient, getCustomTextTone, CUSTOM_BACKGROUND_ID, type InvitationDesign } from "@/design/invitation";
@@ -9,6 +10,7 @@ export interface InvitationCardProps {
   message: string;
   recipientName?: string | null;
   design: InvitationDesign;
+  mood?: MascotMood;
   className?: string;
 }
 
@@ -24,7 +26,7 @@ const STICKER_SLOTS: CSSProperties[] = [
   { bottom: 12, right: 16, transform: "rotate(-11deg)", fontSize: "2rem" },
 ];
 
-export function InvitationCard({ title, message, recipientName, design, className }: InvitationCardProps) {
+export function InvitationCard({ title, message, recipientName, design, mood = "happy", className }: InvitationCardProps) {
   const isCustom = design.backgroundId === CUSTOM_BACKGROUND_ID && design.customColors;
   const cardBackground = isCustom ? buildCustomGradient(design.customColors!) : getBackground(design.backgroundId).cardBackground;
   const isLight = isCustom ? getCustomTextTone(design.customColors!) === "light" : getBackground(design.backgroundId).textTone === "light";
@@ -53,7 +55,7 @@ export function InvitationCard({ title, message, recipientName, design, classNam
       })}
 
       <div className={`relative z-10 ${reserveBottomSpace ? "pb-6" : ""}`}>
-        <Mascot species={design.mascotId} mood="happy" className="mx-auto h-32 w-auto" />
+        <Mascot species={design.mascotId} mood={mood} className="mx-auto h-32 w-auto" />
 
         <h2 className={`mt-2 font-display text-2xl font-extrabold ${isLight ? "text-white" : "text-[#2A1145]"}`}>
           {title?.trim() || (recipientName ? `Hey ${recipientName} 👋` : "Hey there 👋")}
