@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MASCOTS } from "@/design/mascots";
-import { MESSAGE_MAX_LENGTH, RECIPIENT_NAME_MAX_LENGTH, TITLE_MAX_LENGTH } from "@/design/invitation";
+import {
+  MESSAGE_MAX_LENGTH,
+  RECIPIENT_NAME_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+  DEFAULT_CUSTOM_COLORS,
+  type CustomColors,
+} from "@/design/invitation";
 import { saveDraft, sendInvitation, type InvitationPatch } from "./actions";
 import { MascotPicker } from "./mascot-picker";
 import { BackgroundPicker } from "./background-picker";
@@ -20,7 +26,7 @@ interface InvitationRow {
   message: string;
   recipient_name: string | null;
   share_token: string;
-  design: { mascotId: string; backgroundId: string; stickers: string[] };
+  design: { mascotId: string; backgroundId: string; customColors?: CustomColors; stickers: string[] };
 }
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -31,6 +37,7 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
   const [recipientName, setRecipientName] = useState(invitation.recipient_name ?? "");
   const [mascotId, setMascotId] = useState(invitation.design.mascotId ?? MASCOTS[0].id);
   const [backgroundId, setBackgroundId] = useState(invitation.design.backgroundId);
+  const [customColors, setCustomColors] = useState<CustomColors>(invitation.design.customColors ?? DEFAULT_CUSTOM_COLORS);
   const [stickers, setStickers] = useState<string[]>(invitation.design.stickers ?? []);
 
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -45,7 +52,7 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
     title,
     message,
     recipientName,
-    design: { mascotId, backgroundId, stickers },
+    design: { mascotId, backgroundId, customColors, stickers },
   };
 
   useEffect(() => {
@@ -66,7 +73,7 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, message, recipientName, mascotId, backgroundId, stickers]);
+  }, [title, message, recipientName, mascotId, backgroundId, customColors, stickers]);
 
   async function handleSend() {
     setSendState("sending");
@@ -97,7 +104,7 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
           title={title}
           message={message}
           recipientName={recipientName}
-          design={{ mascotId, backgroundId, stickers }}
+          design={{ mascotId, backgroundId, customColors, stickers }}
           className="w-full"
         />
         <div className="space-y-1">
@@ -180,7 +187,12 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
 
         <div className="space-y-1.5">
           <Label>Background</Label>
-          <BackgroundPicker value={backgroundId} onChange={setBackgroundId} />
+          <BackgroundPicker
+            value={backgroundId}
+            customColors={customColors}
+            onChange={setBackgroundId}
+            onCustomColorsChange={setCustomColors}
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -211,7 +223,7 @@ export function InvitationBuilder({ invitation }: { invitation: InvitationRow })
           title={title}
           message={message}
           recipientName={recipientName}
-          design={{ mascotId, backgroundId, stickers }}
+          design={{ mascotId, backgroundId, customColors, stickers }}
         />
       </div>
     </div>

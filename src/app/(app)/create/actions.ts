@@ -5,11 +5,18 @@ import { createClient } from "@/lib/supabase/server";
 import { MASCOTS } from "@/design/mascots";
 import { BACKGROUNDS } from "@/design/backgrounds";
 import { STICKERS, MAX_STICKERS } from "@/design/stickers";
-import { MESSAGE_MAX_LENGTH, TITLE_MAX_LENGTH, RECIPIENT_NAME_MAX_LENGTH } from "@/design/invitation";
+import {
+  MESSAGE_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+  RECIPIENT_NAME_MAX_LENGTH,
+  CUSTOM_BACKGROUND_ID,
+  isValidHexColor,
+} from "@/design/invitation";
 
 const mascotIds = MASCOTS.map((m) => m.id) as [string, ...string[]];
-const backgroundIds = BACKGROUNDS.map((b) => b.id) as [string, ...string[]];
+const backgroundIds = BACKGROUNDS.map((b) => b.id).concat(CUSTOM_BACKGROUND_ID) as [string, ...string[]];
 const stickerIds = STICKERS.map((s) => s.id) as [string, ...string[]];
+const hexColor = z.string().refine(isValidHexColor, "Must be a hex color like #6D28D9.");
 
 const patchSchema = z.object({
   title: z.string().trim().max(TITLE_MAX_LENGTH),
@@ -18,6 +25,7 @@ const patchSchema = z.object({
   design: z.object({
     mascotId: z.enum(mascotIds),
     backgroundId: z.enum(backgroundIds),
+    customColors: z.object({ from: hexColor, to: hexColor }).optional(),
     stickers: z.array(z.enum(stickerIds)).max(MAX_STICKERS),
   }),
 });

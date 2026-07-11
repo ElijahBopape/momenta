@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const svg = `
