@@ -23,7 +23,7 @@ export function AlreadyAnswered({ invitation }: { invitation: PublicInvitation }
   const activity = invitation.response?.activity ? getActivity(invitation.response.activity) : undefined;
 
   return (
-    <div className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-5 px-4 py-16 text-center">
+    <main className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-5 px-4 py-16 text-center">
       <InvitationCard
         title={invitation.title}
         message={invitation.message}
@@ -44,6 +44,6 @@ export function AlreadyAnswered({ invitation }: { invitation: PublicInvitation }
         </div>
       )}
       {!accepted && <p className="text-sm text-muted-foreground">Maybe next time.</p>}
-    </div>
+    </main>
   );
 }

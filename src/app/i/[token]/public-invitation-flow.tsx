@@ -84,7 +84,7 @@ export function PublicInvitationFlow({ token, invitation }: { token: string; inv
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-6 px-4 py-12">
+    <main className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-6 px-4 py-12">
       {screen === "celebrate" && <Confetti />}
 
       {screen === "name" && (
@@ -120,6 +120,7 @@ export function PublicInvitationFlow({ token, invitation }: { token: string; inv
 
       {(screen === "ask" || screen === "reject") && (
         <div className="w-full space-y-5 text-center">
+          <h1 className="sr-only">You&apos;ve been invited</h1>
           <InvitationCard
             title={invitation.title || `Hey ${recipientName} 👋`}
             message={screen === "reject" ? (rejectLine ?? "") : invitation.message}
@@ -245,6 +246,6 @@ export function PublicInvitationFlow({ token, invitation }: { token: string; inv
           <p className="text-sm text-muted-foreground">Maybe next time. Thanks for letting them know.</p>
         </div>
       )}
-    </div>
+    </main>
   );
 }

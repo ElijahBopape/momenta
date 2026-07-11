@@ -4,7 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 
 export default function InvitationNotFound() {
   return (
-    <div className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-4 px-4 py-16 text-center">
+    <main className="mx-auto flex min-h-full max-w-sm flex-1 flex-col items-center justify-center gap-4 px-4 py-16 text-center">
       <Mascot species="sloth" mood="smirk" className="h-28 w-auto" />
       <h1 className="font-display text-2xl font-extrabold">This invitation doesn&apos;t exist</h1>
       <p className="text-sm text-muted-foreground">
@@ -13,6 +13,6 @@ export default function InvitationNotFound() {
       <Link href="/" className={buttonVariants({ className: "rounded-full" })}>
         Go to momenta
       </Link>
-    </div>
+    </main>
   );
 }

@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/brand/status-badge";
 import { AddToCalendarButton } from "@/components/brand/add-to-calendar-button";
 import { WeatherWidget } from "@/components/brand/weather-widget";
 import { getActivity } from "@/design/activities";
+import { getSiteURL } from "@/lib/site-url";
 import { CopyLinkButton } from "./copy-link-button";
 
 function formatResponseDate(iso: string) {
@@ -55,7 +56,7 @@ export default async function InvitationDetailPage({ params }: { params: Promise
     response = data;
   }
 
-  const shareUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://momenta-web.vercel.app"}/i/${invitation.share_token}`;
+  const shareUrl = `${getSiteURL()}/i/${invitation.share_token}`;
   const sentDate = invitation.sent_at
     ? new Date(invitation.sent_at).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })
     : null;
@@ -63,6 +64,7 @@ export default async function InvitationDetailPage({ params }: { params: Promise
 
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center gap-5 py-4 text-center">
+      <h1 className="sr-only">Invitation to {response?.recipient_name ?? invitation.recipient_name ?? "someone"}</h1>
       <StatusBadge status={invitation.status} />
       <InvitationCard
         title={invitation.title}
