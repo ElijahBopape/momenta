@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Baloo_2 } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { getSiteURL } from "@/lib/site-url";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,6 +22,7 @@ const baloo = Baloo_2({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteURL()),
   title: "momenta — every great date starts with one good moment",
   description:
     "Build a personalized invitation card and ask someone out the fun way. Pick a plush companion, send a link, no awkward texts required.",
